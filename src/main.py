@@ -4,7 +4,7 @@ import pandas as pd
 from constants import PCT_TRAIN
 
 from helpers.data_loader import read_data  # Assuming you have a read_data function in your helpers module
-from helpers.data_handler import preprocess_and_split_data
+from helpers.data_handler import preprocess_and_split_data, create_sequences, standardize_data
 
 import matplotlib.pyplot as plt
 
@@ -23,6 +23,24 @@ print("Loading completed ...\n")
 
 # Preprocess the data and split them into train test
 orderbook_train, trades_train, orderbook_test, trades_test = preprocess_and_split_data(orderbook_df, trades_df, PCT_TRAIN)
+
+# Step 1: Create Sequences
+seq_length = 10  # Using the last 10 timesteps as a sequence
+orderbook_sequences, trades_sequences, target_sequences = create_sequences(orderbook_train, trades_train, seq_length)
+
+# Step 2: Standardize the Data
+orderbook_train_scaled, orderbook_test_scaled = standardize_data(orderbook_train, orderbook_test)
+trades_train_scaled, trades_test_scaled = standardize_data(trades_train, trades_test)
+
+# Step 3: Convert to Sequences after Scaling
+orderbook_sequences_scaled, trades_sequences_scaled, target_sequences_scaled = create_sequences(
+    orderbook_train_scaled, trades_train_scaled, seq_length)
+
+## Step 4: Prepare DataLoader for Training
+#train_dataset = TensorDataset(orderbook_sequences_scaled, trades_sequences_scaled, target_sequences_scaled)
+#train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+# Now you're ready to use `train_loader` in your training loop
 
 #plt.plot(orderbook_train['Best Ask'], label='Best Ask', color = 'r', linewidth = 0.5)
 #plt.plot(orderbook_train['Best Ask'], label='Best Bid', color = 'b', linewidth = 0.5)
