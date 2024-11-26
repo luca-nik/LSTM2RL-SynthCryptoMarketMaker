@@ -1,27 +1,36 @@
-import pandas as pd
-import torch
-from helpers.data_loader import read_data  # Assuming you have a read_data function in your helpers module
-from classes.orderbook_generator import OrderBookGenerator, train_order_book_generator,  preprocess_orderbook_data
-from classes.trades_generator import TradesGenerator, generate_trades, train_trades_generator
-import matplotlib.pyplot as plt
-import os
 import sys
+import pandas as pd
 
-#################################
-# Just having some fun ...
-#################################
+from constants import PCT_TRAIN
 
-## Set pandas display option to show 8 digits after the decimal point
-#pd.set_option('display.float_format', '{:.8f}'.format)
-#
-## Print a message indicating that data loading is starting
-#print("Loading orderbook and trading data ...")
-#
-## Load the orderbook and trading data
-#orderbook_df, trades_df = read_data()
-#
-## Print a message indicating that the loading process is completed
-#print("Loading completed ...\n")
+from helpers.data_loader import read_data  # Assuming you have a read_data function in your helpers module
+from helpers.data_handler import preprocess_and_split_data
+
+import matplotlib.pyplot as plt
+
+
+# Set pandas display option to show 8 digits after the decimal point
+pd.set_option('display.float_format', '{:.8f}'.format)
+
+# Print a message indicating that data loading is starting
+print("Loading orderbook and trading data ...")
+
+# Load the orderbook and trading data
+orderbook_df, trades_df = read_data()
+
+# Print a message indicating that the loading process is completed
+print("Loading completed ...\n")
+
+# Preprocess the data and split them into train test
+orderbook_train, trades_train, orderbook_test, trades_test = preprocess_and_split_data(orderbook_df, trades_df, PCT_TRAIN)
+
+#plt.plot(orderbook_train['Best Ask'], label='Best Ask', color = 'r', linewidth = 0.5)
+#plt.plot(orderbook_train['Best Ask'], label='Best Bid', color = 'b', linewidth = 0.5)
+#plt.legend()
+#plt.savefig('images/example.png', dpi=400) 
+### Train orderbook
+
+
 #
 ## Now, `orderbook_df` contains only the 'lastUpdated', 'best_ask', and 'best_bid' columns
 #orderbook_df = preprocess_orderbook_data(orderbook_df)
