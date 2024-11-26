@@ -1,3 +1,4 @@
+![Status](https://img.shields.io/badge/Status-Work_in_Progress-yellow)
 # LSTM2RL-SynthCryptoMarketMaker  
 
 ## Overview  
