@@ -2,6 +2,7 @@ from typing import Tuple
 
 import torch
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -106,6 +107,11 @@ def create_sequences(orderbook_data: pd.DataFrame, trades_data: pd.DataFrame, se
         orderbook_sequences.append(orderbook_seq)
         trades_sequences.append(trades_seq)
         target_sequences.append(target)
+
+    # Convert lists to numpy arrays before converting to tensors
+    orderbook_sequences = np.array(orderbook_sequences)
+    trades_sequences = np.array(trades_sequences)
+    target_sequences = np.array(target_sequences)
 
     return torch.tensor(orderbook_sequences, dtype=torch.float32), \
            torch.tensor(trades_sequences, dtype=torch.float32), \
