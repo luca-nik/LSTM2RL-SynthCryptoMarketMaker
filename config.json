@@ -4,9 +4,8 @@
     "pct_train": 0.8
   },
   "model": {
-    "input_size": 64,
-    "hidden_size": 128,
-    "num_layers": 2
+    "hidden_size": 64,
+    "num_layers": 1
   },
   "training": {
     "batch_size": 32,
@@ -15,7 +14,7 @@
     "early_stopping_patience": 10
   },
   "paths": {
-    "model_path": "models/orderbook_generator.pth",
+    "model_path": "data/models/orderbook_generator.pth",
     "images_path": "images/",
     "trades_files_path": "attachments/trades.csv",
     "trades_save_path": "data/trades_df.parquet",
