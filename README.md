@@ -18,3 +18,7 @@ This project provides a framework for testing and improving market-making strate
 - Model complex market dynamics using deep learning.  
 - Create a safe and flexible environment for experimenting with trading strategies.  
 - Advance the understanding of liquidity provision and risk management in financial markets.  
+
+## TODO:
+Controllare un po il codice. 
+Vedere come trasformare indietro i dati stimati

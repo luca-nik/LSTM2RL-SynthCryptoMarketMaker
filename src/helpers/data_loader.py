@@ -2,32 +2,6 @@ from pathlib import Path
 from typing import List, Tuple, Union
 import pandas as pd
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env
-load_dotenv()
-
-def get_env_variable(var_name: str, default: Union[str, None] = None) -> str:
-    """
-    Helper function to fetch environment variable or return a default value.
-    
-    Args:
-        var_name (str): Name of the environment variable.
-        default (str, optional): Default value if the variable is not found. Defaults to None.
-    
-    Returns:
-        str: Value of the environment variable.
-    """
-    value = os.getenv(var_name, default)
-    if value is None:
-        raise ValueError(f"Missing environment variable: {var_name}")
-    return value
-
-# Fetch paths using the helper function
-trades_file_path = get_env_variable("TRADES_FILE_PATH", "attachments/trades.csv")
-trades_save_path = get_env_variable("TRADES_SAVE_PATH", "data/trades_df.parquet")
-orderbook_files_path = get_env_variable("ORDERBOOK_FILES_PATH", "attachments/binance_iotabtc_orderbooks/")
-orderbook_save_path = get_env_variable("ORDERBOOK_SAVE_PATH", "data/full_orderbook_df.parquet")
 
 def read_trades_csv(filepath: Union[str, Path], save_path: Union[str, Path]) -> pd.DataFrame:
     """
@@ -133,7 +107,7 @@ def concatenate_orderbook_series(folder_path: Union[str, Path], save_path: Union
 
     return concatenated_df
 
-def read_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
+def read_data(CONFIG: dict) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Reads the trades and order book data using paths stored in environment variables.
     
@@ -143,8 +117,8 @@ def read_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     
     # Read trades and orderbook data, save them for quicker processing
-    trades_df = read_trades_csv(trades_file_path, trades_save_path)
-    orderbook_df = concatenate_orderbook_series(orderbook_files_path, orderbook_save_path)
+    trades_df = read_trades_csv(CONFIG['paths']['trades_files_path'], CONFIG['paths']['trades_save_path'])
+    orderbook_df = concatenate_orderbook_series(CONFIG['paths']['orderbook_files_path'], CONFIG['paths']['orderbook_save_path'])
 
     # Ensure both dataframes are sorted by timestamps
     orderbook_df = orderbook_df.sort_values('lastUpdated')

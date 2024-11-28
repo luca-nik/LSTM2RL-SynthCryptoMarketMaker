@@ -1,38 +1,44 @@
+import os
 import sys
+import json
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 
-from constants import PCT_TRAIN
 from helpers.data_loader import read_data
 from helpers.data_handler import preprocess_and_split_data, create_sequences, standardize_data
+from helpers.configurator import load_config
 from classes.orderbook_generator import OrderBookGenerator
 from classes.plotter import Plotter
+
+# Load config file
+CONFIG = load_config()
+
+# Define retraining flag
+retrain_model = False  # Set to True if you want to retrain the model
 
 # Set pandas display option to show 8 digits after the decimal point
 pd.set_option('display.float_format', '{:.8f}'.format)
 
 # Initialize Plotter
-plotter = Plotter(output_directory='images/')
+plotter = Plotter(CONFIG['paths']['images_path'])
 
 # Check for GPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}\n")
 
-# Define retraining flag
-retrain_model = False  # Set to True if you want to retrain the model
-
 # Print a message indicating that data loading is starting
 print("Loading orderbook and trading data ...")
 
 # Load the orderbook and trading data
-orderbook_df, trades_df = read_data()
+orderbook_df, trades_df = read_data(CONFIG)
 
 # Print a message indicating that the loading process is completed
 print("Loading completed ...\n")
+sys.exit()
 
 # Preprocess the data and split them into train test
 orderbook_train, trades_train, orderbook_test, trades_test = preprocess_and_split_data(orderbook_df, trades_df, PCT_TRAIN)
@@ -77,7 +83,7 @@ if os.path.exists(model_path) and not retrain_model:
 else:
     print("Training model ...")
     # Train the model and get loss history
-    epochs = 10
+    epochs = 100
     epoch_losses = model.train_model(train_loader, epochs=epochs, lr=0.005, device=device)
 
     # Save the trained model

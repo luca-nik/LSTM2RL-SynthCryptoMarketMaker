@@ -1,0 +1,25 @@
+{
+  "data": {
+    "seq_length": 10,
+    "pct_train": 0.8
+  },
+  "model": {
+    "input_size": 64,
+    "hidden_size": 128,
+    "num_layers": 2
+  },
+  "training": {
+    "batch_size": 32,
+    "epochs": 100,
+    "learning_rate": 0.001,
+    "early_stopping_patience": 10
+  },
+  "paths": {
+    "model_path": "models/orderbook_generator.pth",
+    "images_path": "images/",
+    "trades_files_path": "attachments/trades.csv",
+    "trades_save_path": "data/trades_df.parquet",
+    "orderbook_files_path" : "attachments/binance_iotabtc_orderbooks/",
+    "orderbook_save_path" : "data/full_orderbook_df.parquet"
+  }
+}
