@@ -111,6 +111,9 @@ def read_data(CONFIG: dict) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Reads the trades and order book data using paths stored in environment variables.
     
+    Args:
+        CONFIG (dict): configuration dictionary
+
     Returns:
         pd.DataFrame: DataFrame containing the order book data.
         pd.DataFrame: DataFrame containing the trade data.

@@ -38,19 +38,17 @@ orderbook_df, trades_df = read_data(CONFIG)
 
 # Print a message indicating that the loading process is completed
 print("Loading completed ...\n")
-sys.exit()
 
 # Preprocess the data and split them into train test
-orderbook_train, trades_train, orderbook_test, trades_test = preprocess_and_split_data(orderbook_df, trades_df, PCT_TRAIN)
+orderbook_train, trades_train, orderbook_test, trades_test = preprocess_and_split_data(orderbook_df, trades_df, CONFIG)
 
 # Step 1: Standardize the Data
 orderbook_train_scaled, orderbook_test_scaled = standardize_data(orderbook_train, orderbook_test)
 trades_train_scaled, trades_test_scaled = standardize_data(trades_train, trades_test)
 
 # Step 2: Create Sequences
-seq_length = 10  # Using the last 10 timesteps as a sequence
 orderbook_sequences_scaled, trades_sequences_scaled, target_sequences_scaled = create_sequences(
-    orderbook_train_scaled, trades_train_scaled, seq_length)
+    orderbook_train_scaled, trades_train_scaled, CONFIG)
 
 # The sequences are already tensors, so no need to use np.concatenate
 # Just directly use the tensors as they are returned from create_sequences
@@ -59,6 +57,7 @@ target_sequences_scaled_tensor = target_sequences_scaled
 
 # Step 3: Prepare DataLoader for Training
 train_dataset = TensorDataset(orderbook_sequences_scaled_tensor, target_sequences_scaled_tensor)
+sys.exit()
 
 # Using batch_size=64 without shuffling, since this is time-series data
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=False)

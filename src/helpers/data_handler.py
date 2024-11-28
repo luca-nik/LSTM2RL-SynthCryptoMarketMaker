@@ -6,13 +6,10 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
 
-from constants import PCT_TRAIN
-
 def preprocess_and_split_data(
     orderbook_df: pd.DataFrame, 
-    trades_df: pd.DataFrame, 
-    pct_train: float = PCT_TRAIN
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    trades_df: pd.DataFrame,
+    CONFIG: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Preprocesses the orderbook and trades data, extracts relevant features, 
     and splits the data into training and testing sets.
@@ -20,7 +17,7 @@ def preprocess_and_split_data(
     Args:
         orderbook_df (pd.DataFrame): DataFrame containing the orderbook data with 'asks' and 'bids'.
         trades_df (pd.DataFrame): DataFrame containing the trade data with 'price', 'side', and 'amount'.
-        pct_train (float): The percentage of the data to use for training (between 0 and 1).
+        CONFIG (dict): configuration dictionary
 
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -29,6 +26,9 @@ def preprocess_and_split_data(
             - Testing orderbook data (pd.DataFrame).
             - Testing trades data (pd.DataFrame).
     """
+
+    PCT_TRAIN = CONFIG['data']['pct_train']
+
     # Preprocess the orderbook data to extract the best bid and ask information
     preprocess_orderbook_df = orderbook_df.apply(orderbook_extract_bid_ask, axis=1)
     
@@ -40,7 +40,7 @@ def preprocess_and_split_data(
     preprocess_trades_df.columns = ['Price', 'Amount', 'Side']
 
     # Calculate the train-test split index
-    train_size = int(pct_train * len(orderbook_df))
+    train_size = int(PCT_TRAIN * len(orderbook_df))
 
     # Split the preprocessed data into training and testing sets
     orderbook_train = preprocess_orderbook_df[:train_size]
@@ -82,19 +82,20 @@ def trades_extract_price_side_amount(row: pd.Series) -> pd.Series:
     amount = row['amount']
     return pd.Series([price, amount, side])
 
-def create_sequences(orderbook_data: pd.DataFrame, trades_data: pd.DataFrame, seq_length: int):
+def create_sequences(orderbook_data: pd.DataFrame, trades_data: pd.DataFrame, CONFIG: dict):
     """
     Create sequences of data (with historical context) for training.
     
     Args:
         orderbook_data (pd.DataFrame): DataFrame containing order book features.
         trades_data (pd.DataFrame): DataFrame containing trade features.
-        seq_length (int): Length of the sequence for the LSTM.
+        CONFIG (dict): configuration dictionary
     
     Returns:
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: 
             Sequences of orderbook, trades data, and target values.
     """
+    seq_length = CONFIG['data']['seq_length']
     orderbook_sequences = []
     trades_sequences = []
     target_sequences = []
