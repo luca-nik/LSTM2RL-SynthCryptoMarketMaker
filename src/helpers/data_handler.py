@@ -149,7 +149,7 @@ def standardize_data(train_data: pd.DataFrame, test_data: pd.DataFrame) -> Tuple
     train_data_scaled = pd.DataFrame(train_data_scaled, columns=train_data.columns)
     test_data_scaled = pd.DataFrame(test_data_scaled, columns=test_data.columns)
     
-    return train_data_scaled, test_data_scaled
+    return train_data_scaled, test_data_scaled, scaler
 
 def prepare_data(orderbook_df: pd.DataFrame, trades_df: pd.DataFrame, CONFIG: dict):
 
@@ -158,8 +158,8 @@ def prepare_data(orderbook_df: pd.DataFrame, trades_df: pd.DataFrame, CONFIG: di
     orderbook_train, trades_train, orderbook_test, trades_test = filter_relevant_features_and_split_data(orderbook_df, trades_df, CONFIG)
     
     # Step 1: Standardize the Data
-    orderbook_train_scaled, orderbook_test_scaled = standardize_data(orderbook_train, orderbook_test)
-    trades_train_scaled, trades_test_scaled = standardize_data(trades_train, trades_test)
+    orderbook_train_scaled, orderbook_test_scaled, orderbook_scaler = standardize_data(orderbook_train, orderbook_test)
+    trades_train_scaled, trades_test_scaled, trades_scaler = standardize_data(trades_train, trades_test)
     
     # Step 2: Create Sequences for training 
     orderbook_train_sequences, trades_train_sequences, orderbook_train_target_sequences, trades_train_target_sequences = \
@@ -175,4 +175,4 @@ def prepare_data(orderbook_df: pd.DataFrame, trades_df: pd.DataFrame, CONFIG: di
     orderbook_test_dataset = TensorDataset(orderbook_test_sequences, orderbook_test_target_sequences)
     trades_test_dataset = TensorDataset(trades_test_sequences, trades_test_target_sequences)
 
-    return orderbook_train_dataset, trades_train_dataset, orderbook_test_dataset, trades_test_dataset
+    return orderbook_train_dataset, trades_train_dataset, orderbook_test_dataset, trades_test_dataset, orderbook_scaler, trades_scaler

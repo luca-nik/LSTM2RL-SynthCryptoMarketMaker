@@ -6,6 +6,8 @@ import pandas as pd
 from typing import Tuple
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.preprocessing import StandardScaler
+
 
 from classes.plotter import Plotter
 
@@ -18,6 +20,11 @@ class OrderBookGenerator(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         lstm_out, (h_n, c_n) = self.lstm(x)
         out = self.fc(lstm_out[:, -1, :])  # Take the output of the last time step
+
+        # Apply ReLU to ask volume (index 1) and bid volume (index 3)
+        out[:, 1] = torch.relu(out[:, 1])  # Ask volume
+        out[:, 3] = torch.relu(out[:, 3])  # Bid volume
+
         return out
 
     def train_model(self, train_loader: DataLoader, epochs: int, lr: float = 0.001, device: torch.device = torch.device('cpu')) -> list:
@@ -70,7 +77,8 @@ class OrderBookGenerator(nn.Module):
         with torch.no_grad():
             return self(input_data)
     
-def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, device : torch.device = torch.device('cpu')):
+def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
+                                  device : torch.device = torch.device('cpu'), orderbook_scaler: StandardScaler =  StandardScaler()):
     
     # Initialize Plotter
     plotter = Plotter(CONFIG['paths']['images_path'])
@@ -112,4 +120,4 @@ def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, 
 
 
     # Use the plotter to save plots after the model evaluation
-    plotter.plot_actual_vs_predicted(model, orderbook_train_loader, device)
+    plotter.plot_actual_vs_predicted(model, orderbook_train_loader, device, orderbook_scaler)
