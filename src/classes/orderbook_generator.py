@@ -1,12 +1,15 @@
 import os
+import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import pandas as pd
+import numpy as np
 from typing import Tuple
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, r2_score
 
 
 from classes.plotter import Plotter
@@ -19,7 +22,16 @@ class OrderBookGenerator(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         lstm_out, (h_n, c_n) = self.lstm(x)
-        out = self.fc(lstm_out[:, -1, :])  # Take the output of the last time step
+        # Check if lstm_out is 3D
+        if lstm_out.dim() == 3:
+            # If lstm_out is 3D, take the output of the last time step
+            out = self.fc(lstm_out[:, -1, :])
+        elif lstm_out.dim() == 2:
+            # If lstm_out is 2D, directly use it (you might need to adjust based on your setup)
+            out = self.fc(lstm_out)
+        else:
+            raise ValueError("Unexpected output shape from LSTM")
+        #out = self.fc(lstm_out[:, -1, :])  # Take the output of the last time step
 
         # Apply ReLU to ask volume (index 1) and bid volume (index 3)
         out[:, 1] = torch.relu(out[:, 1])  # Ask volume
@@ -27,34 +39,44 @@ class OrderBookGenerator(nn.Module):
 
         return out
 
-    def train_model(self, train_loader: DataLoader, epochs: int, lr: float = 0.001, device: torch.device = torch.device('cpu')) -> list:
+    def train_model(self, train_loader: DataLoader, epochs: int, lr: float = 0.001, device: torch.device = torch.device('cpu'), penalty_weight: float = 0.1) -> list:
         criterion = nn.MSELoss()
         optimizer = optim.Adam(self.parameters(), lr=lr)
         
         epoch_losses = []  # List to store average loss for each epoch
-
+    
         for epoch in range(epochs):
             epoch_loss = 0.0  # Initialize epoch loss
-
+    
             # Iterate through the batches in train_loader
             for orderbook_batch, target_batch in train_loader:
                 orderbook_batch = orderbook_batch.to(device)
                 target_batch = target_batch.to(device)
-
+    
                 # Forward pass
                 output = self(orderbook_batch)
                 
-                # Compute loss
-                loss = criterion(output, target_batch)
+                # Compute MSE loss
+                mse_loss = criterion(output, target_batch)
                 
+                # Compute penalty for negative predictions of ask and bid volumes
+                negative_ask_volume = torch.sum(torch.clamp(output[:, 1], min=0))  # Penalty for negative ask volume
+                negative_bid_volume = torch.sum(torch.clamp(output[:, 3], min=0))  # Penalty for negative bid volume
+    
+                # Total penalty
+                penalty = penalty_weight * (negative_ask_volume + negative_bid_volume)
+    
+                # Total loss (MSE loss + penalty)
+                total_loss = mse_loss + penalty
+    
                 # Backward pass and optimization
                 optimizer.zero_grad()
-                loss.backward()
+                total_loss.backward()
                 optimizer.step()
                 
                 # Accumulate loss for this batch
-                epoch_loss += loss.item()
-
+                epoch_loss += total_loss.item()
+    
             # Compute average loss for this epoch
             avg_epoch_loss = epoch_loss / len(train_loader)
             epoch_losses.append(avg_epoch_loss)
@@ -62,7 +84,7 @@ class OrderBookGenerator(nn.Module):
             if (epoch + 1) % 5 == 0:
                 print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}")
         
-        return epoch_losses  # Return the loss history for plotting  
+        return epoch_losses  # Return the loss history for plotting
 
     def predict(self, input_data: torch.Tensor) -> torch.Tensor:
         """
@@ -76,6 +98,86 @@ class OrderBookGenerator(nn.Module):
         """
         with torch.no_grad():
             return self(input_data)
+
+    def test(self, test_data, device: torch.device, scaler: StandardScaler):
+        """
+        Evaluate the model on the test dataset and visualize the results.
+    
+        Args:
+            test_loader (DataLoader): Test data loader.
+            device (torch.device): Device (CPU or GPU) where the model runs.
+            scaler (StandardScaler): Scaler used for transforming the data (used for inverse scaling).
+        """
+        self.eval()  # Set the model to evaluation mode
+
+        test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
+        predictions = []
+        targets = []
+
+        # Loop through the train_loader to get the data
+        with torch.no_grad():
+            for orderbook_batch, target_batch in test_loader:
+                orderbook_batch = orderbook_batch.to(device)
+                target_batch = target_batch.to(device)
+
+                # Get the predictions from the model
+                predicted_values = self.predict(orderbook_batch)
+
+                # Store the predictions and actual targets
+                predictions.append(predicted_values.cpu().numpy())
+                targets.append(target_batch.cpu().numpy())
+
+        # Convert predictions and targets into a numpy array for easier plotting
+        predictions = np.concatenate(predictions, axis=0)
+        targets = np.concatenate(targets, axis=0)
+
+        # Inverse-transform data to the original scale using the scaler
+        predictions_original = scaler.inverse_transform(predictions)
+        targets_original = scaler.inverse_transform(targets)
+
+        # Evaluate performance (e.g., RMSE, MAE)
+        rmse = np.sqrt(((predictions - targets) ** 2).mean())
+        mae = np.abs(predictions - targets).mean()
+        print(f'RMSE: {rmse}')
+        print(f'MAE: {mae}')
+        
+        # Plot actual vs predicted values for visual inspection
+        plt.figure(figsize=(10, 6))
+        plt.plot(targets_original[:, 0], label="Actual Best Ask", linestyle='--', color='blue')
+        plt.plot(predictions_original[:, 0], label="Predicted Best Ask", color='red')
+        plt.title("Actual vs Predicted Best Ask")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Best Ask Value")
+        plt.legend()
+        plt.savefig(f'images/test_ask.png', dpi=400)  # Save with 400 DPI
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(targets_original[:, 1], label="Actual Ask Volume", linestyle='--', color='blue')
+        plt.plot(predictions_original[:, 1], label="Predicted Ask Volume", color='red')
+        plt.title("Actual vs Predicted Ask Volume")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Ask Volume Value")
+        plt.legend()
+        plt.savefig(f'images/test_ask_volume.png', dpi=400)  # Save with 400 DPI
+
+        # Optionally, plot for Best Bid and Bid Volume as well
+        plt.figure(figsize=(10, 6))
+        plt.plot(targets_original[:, 2], label="Actual Best Bid", linestyle='--', color='blue')
+        plt.plot(predictions_original[:, 2], label="Predicted Best Bid", color='red')
+        plt.title("Actual vs Predicted Best Bid")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Best Bid Value")
+        plt.legend()
+        plt.savefig(f'images/test_bid.png', dpi=400)  # Save with 400 DPI
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(targets_original[:, 3], label="Actual Bid Volume", linestyle='--', color='blue')
+        plt.plot(predictions_original[:, 3], label="Predicted Bid Volume", color='red')
+        plt.title("Actual vs Predicted Bid Volume")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Bid Volume Value")
+        plt.legend()
+        plt.savefig(f'images/test_bid_volume.png', dpi=400)  # Save with 400 DPI
     
 def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
                                   device : torch.device = torch.device('cpu'), orderbook_scaler: StandardScaler =  StandardScaler()):
@@ -121,3 +223,7 @@ def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, 
 
     # Use the plotter to save plots after the model evaluation
     plotter.plot_actual_vs_predicted(model, orderbook_train_loader, device, orderbook_scaler)
+
+    return model
+
+

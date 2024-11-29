@@ -164,15 +164,18 @@ def prepare_data(orderbook_df: pd.DataFrame, trades_df: pd.DataFrame, CONFIG: di
     # Step 2: Create Sequences for training 
     orderbook_train_sequences, trades_train_sequences, orderbook_train_target_sequences, trades_train_target_sequences = \
         create_sequences(orderbook_train_scaled, trades_train_scaled, CONFIG)
-    # Sequences for test
-    orderbook_test_sequences, trades_test_sequences, orderbook_test_target_sequences, trades_test_target_sequences = \
-        create_sequences(orderbook_test_scaled, trades_test_scaled, CONFIG)
     
     # Step 3: Prepare DataLoader for Training
     orderbook_train_dataset = TensorDataset(orderbook_train_sequences, orderbook_train_target_sequences)
     trades_train_dataset = TensorDataset(trades_train_sequences, trades_train_target_sequences)
     # And for test
-    orderbook_test_dataset = TensorDataset(orderbook_test_sequences, orderbook_test_target_sequences)
-    trades_test_dataset = TensorDataset(trades_test_sequences, trades_test_target_sequences)
+    orderbook_test_dataset = TensorDataset(
+        torch.tensor(orderbook_test_scaled.values, dtype=torch.float32), 
+        torch.tensor(orderbook_test_scaled.values, dtype=torch.float32)
+        )
+    trades_test_dataset = TensorDataset(
+        torch.tensor(trades_test_scaled.values, dtype=torch.float32), 
+        torch.tensor(trades_test_scaled.values, dtype=torch.float32)
+        )
 
     return orderbook_train_dataset, trades_train_dataset, orderbook_test_dataset, trades_test_dataset, orderbook_scaler, trades_scaler
