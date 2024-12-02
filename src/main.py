@@ -37,7 +37,7 @@ def main():
     # Initialize the model
     orderbook_model = orderbook_model_load_or_train(orderbook_train, CONFIG, retrain_model, device, ob_scaler)
     print("Testing the model ...")
-    #orderbook_model.test(orderbook_test, device, ob_scaler)
+    orderbook_model.test(orderbook_test, device)
 
     
     #trades_train_loader = DataLoader(trades_train, batch_size=CONFIG['training']['batch_size'], shuffle=False)

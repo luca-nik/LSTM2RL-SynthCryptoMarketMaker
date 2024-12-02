@@ -89,8 +89,7 @@ class OrderBookGenerator(nn.Module):
                 print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}")
 
         # Plot the loss history
-        self.plotter.output_directory = self.plotter.output_directory + 'training/'
-        self.plotter.plot_loss(epoch_losses)
+        self.plotter.plot_loss(np.asarray(epoch_losses), target_directory = 'training/')
         
         # Evaluate trained model and plot
         self.eval()
@@ -120,7 +119,7 @@ class OrderBookGenerator(nn.Module):
         targets_original = self.scaler.inverse_transform(targets)
         
         # Plot Actual vs predicted on training set
-        self.plotter.plot_actual_vs_predicted(targets_original, predictions_original)
+        self.plotter.plot_actual_vs_predicted(targets_original, predictions_original, target_directory = 'training/')
 
     def predict(self, input_data: torch.Tensor) -> torch.Tensor:
         """
@@ -135,89 +134,51 @@ class OrderBookGenerator(nn.Module):
         with torch.no_grad():
             return self(input_data)
 
-    #def test(self, test_data, device: torch.device, scaler: StandardScaler):
-    #    """
-    #    Evaluate the model on the test dataset and visualize the results.
+    def test(self, test_data, device: torch.device):
+        """
+        Evaluate the model on the test dataset and visualize the results.
     
-    #    Args:
-    #        test_loader (DataLoader): Test data loader.
-    #        device (torch.device): Device (CPU or GPU) where the model runs.
-    #        scaler (StandardScaler): Scaler used for transforming the data (used for inverse scaling).
-    #    """
-    #    self.eval()  # Set the model to evaluation mode
+        Args:
+            test_data
+            device (torch.device): Device (CPU or GPU) where the model runs.
+        """
+        self.eval()  # Set the model to evaluation mode
 
-    #    test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
-    #    predictions = []
-    #    targets = []
+        test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
+        predictions = []
+        targets = []
 
-    #    # Loop through the train_loader to get the data
-    #    with torch.no_grad():
-    #        for orderbook_batch, target_batch in test_loader:
-    #            orderbook_batch = orderbook_batch.to(device)
-    #            target_batch = target_batch.to(device)
+        # Loop through the train_loader to get the data
+        with torch.no_grad():
+            for orderbook_batch, target_batch in test_loader:
+                orderbook_batch = orderbook_batch.to(device)
+                target_batch = target_batch.to(device)
 
-    #            # Get the predictions from the model
-    #            predicted_values = self.predict(orderbook_batch)
+                # Get the predictions from the model
+                predicted_values = self.predict(orderbook_batch)
 
-    #            # Store the predictions and actual targets
-    #            predictions.append(predicted_values.cpu().numpy())
-    #            targets.append(target_batch.cpu().numpy())
+                # Store the predictions and actual targets
+                predictions.append(predicted_values.cpu().numpy())
+                targets.append(target_batch.cpu().numpy())
 
-    #    # Convert predictions and targets into a numpy array for easier plotting
-    #    predictions = np.concatenate(predictions, axis=0)
-    #    targets = np.concatenate(targets, axis=0)
+        # Convert predictions and targets into a numpy array for easier plotting
+        predictions = np.concatenate(predictions, axis=0)
+        targets = np.concatenate(targets, axis=0)
 
-    #    # Inverse-transform data to the original scale using the scaler
-    #    predictions_original = scaler.inverse_transform(predictions)
-    #    targets_original = scaler.inverse_transform(targets)
+        # Inverse-transform data to the original scale using the scaler
+        predictions_original = self.scaler.inverse_transform(predictions)
+        targets_original = self.scaler.inverse_transform(targets)
 
-    #    # Plot
-    #    self.plotter.plot_test
-    #    return predictions
-    #    # Evaluate performance (e.g., RMSE, MAE)
-    #    rmse = np.sqrt(((predictions - targets) ** 2).mean())
-    #    mae = np.abs(predictions - targets).mean()
-    #    print(f'RMSE: {rmse}')
-    #    print(f'MAE: {mae}')
-    #    
-    #    # Plot actual vs predicted values for visual inspection
-    #    plt.figure(figsize=(10, 6))
-    #    plt.plot(targets_original[:, 0], label="Actual Best Ask", linestyle='--', color='blue')
-    #    plt.plot(predictions_original[:, 0], label="Predicted Best Ask", color='red')
-    #    plt.title("Actual vs Predicted Best Ask")
-    #    plt.xlabel("Sample Index")
-    #    plt.ylabel("Best Ask Value")
-    #    plt.legend()
-    #    plt.savefig(f'images/test_ask.png', dpi=400)  # Save with 400 DPI
+        # Print Test info
+        rmse = np.sqrt(((predictions - targets) ** 2).mean())
+        mae = np.abs(predictions - targets).mean()
+        print(f'RMSE: {rmse}')
+        print(f'MAE: {mae}')
 
-    #    plt.figure(figsize=(10, 6))
-    #    plt.plot(targets_original[:, 1], label="Actual Ask Volume", linestyle='--', color='blue')
-    #    plt.plot(predictions_original[:, 1], label="Predicted Ask Volume", color='red')
-    #    plt.title("Actual vs Predicted Ask Volume")
-    #    plt.xlabel("Sample Index")
-    #    plt.ylabel("Ask Volume Value")
-    #    plt.legend()
-    #    plt.savefig(f'images/test_ask_volume.png', dpi=400)  # Save with 400 DPI
-
-    #    # Optionally, plot for Best Bid and Bid Volume as well
-    #    plt.figure(figsize=(10, 6))
-    #    plt.plot(targets_original[:, 2], label="Actual Best Bid", linestyle='--', color='blue')
-    #    plt.plot(predictions_original[:, 2], label="Predicted Best Bid", color='red')
-    #    plt.title("Actual vs Predicted Best Bid")
-    #    plt.xlabel("Sample Index")
-    #    plt.ylabel("Best Bid Value")
-    #    plt.legend()
-    #    plt.savefig(f'images/test_bid.png', dpi=400)  # Save with 400 DPI
-
-    #    plt.figure(figsize=(10, 6))
-    #    plt.plot(targets_original[:, 3], label="Actual Bid Volume", linestyle='--', color='blue')
-    #    plt.plot(predictions_original[:, 3], label="Predicted Bid Volume", color='red')
-    #    plt.title("Actual vs Predicted Bid Volume")
-    #    plt.xlabel("Sample Index")
-    #    plt.ylabel("Bid Volume Value")
-    #    plt.legend()
-    #    plt.savefig(f'images/test_bid_volume.png', dpi=400)  # Save with 400 DPI
-    
+        # Plot
+        self.plotter.plot_actual_vs_predicted(targets_original, predictions_original, target_directory = 'test/')
+        return predictions
+        
 def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
                                   device : torch.device = torch.device('cpu'), orderbook_scaler: StandardScaler =  StandardScaler()):
     
@@ -252,7 +213,7 @@ def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, 
 
         # Save the trained model
         torch.save(model.state_dict(), model_path)
-        print("Model saved!")
+        print("Model saved!\n")
 
 
     return model
