@@ -15,10 +15,14 @@ from sklearn.metrics import mean_squared_error, r2_score
 from classes.plotter import Plotter
 
 class OrderBookGenerator(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int = 1):
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int,  CONFIG: dict, scaler: StandardScaler =  StandardScaler()):
         super(OrderBookGenerator, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
+        self.features = ["Best Ask", "Ask Volume", "Best Bid", "Bid Volume"]
+        # Initialize Plotter
+        self.plotter = Plotter(CONFIG['paths']['images_path'] + 'orderbook/', self.features)
+        self.scaler = scaler
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         lstm_out, (h_n, c_n) = self.lstm(x)
@@ -83,8 +87,40 @@ class OrderBookGenerator(nn.Module):
             
             if (epoch + 1) % 5 == 0:
                 print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}")
+
+        # Plot the loss history
+        self.plotter.output_directory = self.plotter.output_directory + 'training/'
+        self.plotter.plot_loss(epoch_losses)
         
-        return epoch_losses  # Return the loss history for plotting
+        # Evaluate trained model and plot
+        self.eval()
+
+        predictions = []
+        targets = []
+
+        # Loop through the train_loader to get the data
+        with torch.no_grad():
+            for orderbook_batch, target_batch in train_loader:
+                orderbook_batch = orderbook_batch.to(device)
+                target_batch = target_batch.to(device)
+
+                # Get the predictions from the self
+                predicted_values = self.predict(orderbook_batch)
+
+                # Store the predictions and actual targets
+                predictions.append(predicted_values.cpu().numpy())
+                targets.append(target_batch.cpu().numpy())
+
+        # Convert predictions and targets into a numpy array for easier plotting
+        predictions = np.concatenate(predictions, axis=0)
+        targets = np.concatenate(targets, axis=0)
+
+        # Inverse-transform data to the original scale using the scaler
+        predictions_original = self.scaler.inverse_transform(predictions)
+        targets_original = self.scaler.inverse_transform(targets)
+        
+        # Plot Actual vs predicted on training set
+        self.plotter.plot_actual_vs_predicted(targets_original, predictions_original)
 
     def predict(self, input_data: torch.Tensor) -> torch.Tensor:
         """
@@ -99,91 +135,92 @@ class OrderBookGenerator(nn.Module):
         with torch.no_grad():
             return self(input_data)
 
-    def test(self, test_data, device: torch.device, scaler: StandardScaler):
-        """
-        Evaluate the model on the test dataset and visualize the results.
+    #def test(self, test_data, device: torch.device, scaler: StandardScaler):
+    #    """
+    #    Evaluate the model on the test dataset and visualize the results.
     
-        Args:
-            test_loader (DataLoader): Test data loader.
-            device (torch.device): Device (CPU or GPU) where the model runs.
-            scaler (StandardScaler): Scaler used for transforming the data (used for inverse scaling).
-        """
-        self.eval()  # Set the model to evaluation mode
+    #    Args:
+    #        test_loader (DataLoader): Test data loader.
+    #        device (torch.device): Device (CPU or GPU) where the model runs.
+    #        scaler (StandardScaler): Scaler used for transforming the data (used for inverse scaling).
+    #    """
+    #    self.eval()  # Set the model to evaluation mode
 
-        test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
-        predictions = []
-        targets = []
+    #    test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
+    #    predictions = []
+    #    targets = []
 
-        # Loop through the train_loader to get the data
-        with torch.no_grad():
-            for orderbook_batch, target_batch in test_loader:
-                orderbook_batch = orderbook_batch.to(device)
-                target_batch = target_batch.to(device)
+    #    # Loop through the train_loader to get the data
+    #    with torch.no_grad():
+    #        for orderbook_batch, target_batch in test_loader:
+    #            orderbook_batch = orderbook_batch.to(device)
+    #            target_batch = target_batch.to(device)
 
-                # Get the predictions from the model
-                predicted_values = self.predict(orderbook_batch)
+    #            # Get the predictions from the model
+    #            predicted_values = self.predict(orderbook_batch)
 
-                # Store the predictions and actual targets
-                predictions.append(predicted_values.cpu().numpy())
-                targets.append(target_batch.cpu().numpy())
+    #            # Store the predictions and actual targets
+    #            predictions.append(predicted_values.cpu().numpy())
+    #            targets.append(target_batch.cpu().numpy())
 
-        # Convert predictions and targets into a numpy array for easier plotting
-        predictions = np.concatenate(predictions, axis=0)
-        targets = np.concatenate(targets, axis=0)
+    #    # Convert predictions and targets into a numpy array for easier plotting
+    #    predictions = np.concatenate(predictions, axis=0)
+    #    targets = np.concatenate(targets, axis=0)
 
-        # Inverse-transform data to the original scale using the scaler
-        predictions_original = scaler.inverse_transform(predictions)
-        targets_original = scaler.inverse_transform(targets)
+    #    # Inverse-transform data to the original scale using the scaler
+    #    predictions_original = scaler.inverse_transform(predictions)
+    #    targets_original = scaler.inverse_transform(targets)
 
-        # Evaluate performance (e.g., RMSE, MAE)
-        rmse = np.sqrt(((predictions - targets) ** 2).mean())
-        mae = np.abs(predictions - targets).mean()
-        print(f'RMSE: {rmse}')
-        print(f'MAE: {mae}')
-        
-        # Plot actual vs predicted values for visual inspection
-        plt.figure(figsize=(10, 6))
-        plt.plot(targets_original[:, 0], label="Actual Best Ask", linestyle='--', color='blue')
-        plt.plot(predictions_original[:, 0], label="Predicted Best Ask", color='red')
-        plt.title("Actual vs Predicted Best Ask")
-        plt.xlabel("Sample Index")
-        plt.ylabel("Best Ask Value")
-        plt.legend()
-        plt.savefig(f'images/test_ask.png', dpi=400)  # Save with 400 DPI
+    #    # Plot
+    #    self.plotter.plot_test
+    #    return predictions
+    #    # Evaluate performance (e.g., RMSE, MAE)
+    #    rmse = np.sqrt(((predictions - targets) ** 2).mean())
+    #    mae = np.abs(predictions - targets).mean()
+    #    print(f'RMSE: {rmse}')
+    #    print(f'MAE: {mae}')
+    #    
+    #    # Plot actual vs predicted values for visual inspection
+    #    plt.figure(figsize=(10, 6))
+    #    plt.plot(targets_original[:, 0], label="Actual Best Ask", linestyle='--', color='blue')
+    #    plt.plot(predictions_original[:, 0], label="Predicted Best Ask", color='red')
+    #    plt.title("Actual vs Predicted Best Ask")
+    #    plt.xlabel("Sample Index")
+    #    plt.ylabel("Best Ask Value")
+    #    plt.legend()
+    #    plt.savefig(f'images/test_ask.png', dpi=400)  # Save with 400 DPI
 
-        plt.figure(figsize=(10, 6))
-        plt.plot(targets_original[:, 1], label="Actual Ask Volume", linestyle='--', color='blue')
-        plt.plot(predictions_original[:, 1], label="Predicted Ask Volume", color='red')
-        plt.title("Actual vs Predicted Ask Volume")
-        plt.xlabel("Sample Index")
-        plt.ylabel("Ask Volume Value")
-        plt.legend()
-        plt.savefig(f'images/test_ask_volume.png', dpi=400)  # Save with 400 DPI
+    #    plt.figure(figsize=(10, 6))
+    #    plt.plot(targets_original[:, 1], label="Actual Ask Volume", linestyle='--', color='blue')
+    #    plt.plot(predictions_original[:, 1], label="Predicted Ask Volume", color='red')
+    #    plt.title("Actual vs Predicted Ask Volume")
+    #    plt.xlabel("Sample Index")
+    #    plt.ylabel("Ask Volume Value")
+    #    plt.legend()
+    #    plt.savefig(f'images/test_ask_volume.png', dpi=400)  # Save with 400 DPI
 
-        # Optionally, plot for Best Bid and Bid Volume as well
-        plt.figure(figsize=(10, 6))
-        plt.plot(targets_original[:, 2], label="Actual Best Bid", linestyle='--', color='blue')
-        plt.plot(predictions_original[:, 2], label="Predicted Best Bid", color='red')
-        plt.title("Actual vs Predicted Best Bid")
-        plt.xlabel("Sample Index")
-        plt.ylabel("Best Bid Value")
-        plt.legend()
-        plt.savefig(f'images/test_bid.png', dpi=400)  # Save with 400 DPI
+    #    # Optionally, plot for Best Bid and Bid Volume as well
+    #    plt.figure(figsize=(10, 6))
+    #    plt.plot(targets_original[:, 2], label="Actual Best Bid", linestyle='--', color='blue')
+    #    plt.plot(predictions_original[:, 2], label="Predicted Best Bid", color='red')
+    #    plt.title("Actual vs Predicted Best Bid")
+    #    plt.xlabel("Sample Index")
+    #    plt.ylabel("Best Bid Value")
+    #    plt.legend()
+    #    plt.savefig(f'images/test_bid.png', dpi=400)  # Save with 400 DPI
 
-        plt.figure(figsize=(10, 6))
-        plt.plot(targets_original[:, 3], label="Actual Bid Volume", linestyle='--', color='blue')
-        plt.plot(predictions_original[:, 3], label="Predicted Bid Volume", color='red')
-        plt.title("Actual vs Predicted Bid Volume")
-        plt.xlabel("Sample Index")
-        plt.ylabel("Bid Volume Value")
-        plt.legend()
-        plt.savefig(f'images/test_bid_volume.png', dpi=400)  # Save with 400 DPI
+    #    plt.figure(figsize=(10, 6))
+    #    plt.plot(targets_original[:, 3], label="Actual Bid Volume", linestyle='--', color='blue')
+    #    plt.plot(predictions_original[:, 3], label="Predicted Bid Volume", color='red')
+    #    plt.title("Actual vs Predicted Bid Volume")
+    #    plt.xlabel("Sample Index")
+    #    plt.ylabel("Bid Volume Value")
+    #    plt.legend()
+    #    plt.savefig(f'images/test_bid_volume.png', dpi=400)  # Save with 400 DPI
     
 def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
                                   device : torch.device = torch.device('cpu'), orderbook_scaler: StandardScaler =  StandardScaler()):
     
-    # Initialize Plotter
-    plotter = Plotter(CONFIG['paths']['images_path'])
 
     # Model setup
     input_size = orderbook_train.tensors[0].shape[-1]  # Number of features in each input sequence
@@ -192,7 +229,7 @@ def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, 
     num_layers = CONFIG['model']['num_layers']  # Single LSTM layer
     
     # Initialize model and load into device
-    model = OrderBookGenerator(input_size, hidden_size, output_size, num_layers)
+    model = OrderBookGenerator(input_size, hidden_size, output_size, num_layers, CONFIG, orderbook_scaler)
     model.to(device)
 
     # Data loader
@@ -211,18 +248,12 @@ def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, 
         # Train the model and get loss history
         epochs = CONFIG['training']['epochs']
         lr = CONFIG['training']['learning_rate']
-        epoch_losses = model.train_model(orderbook_train_loader, epochs=epochs, lr=lr, device=device)
+        model.train_model(orderbook_train_loader, epochs=epochs, lr=lr, device=device)
 
         # Save the trained model
         torch.save(model.state_dict(), model_path)
         print("Model saved!")
 
-        # Plot the loss history
-        plotter.plot_loss(epoch_losses)
-
-
-    # Use the plotter to save plots after the model evaluation
-    plotter.plot_actual_vs_predicted(model, orderbook_train_loader, device, orderbook_scaler)
 
     return model
 
