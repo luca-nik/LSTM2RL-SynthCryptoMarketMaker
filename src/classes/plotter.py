@@ -32,7 +32,7 @@ class Plotter:
         for i in range(targets.shape[1]):
             self.plot_and_save_figure(targets[:, i], predictions[:, i], self.features[i], self.features[i], target_directory)
 
-        print("Figures saved successfully!")
+        print("  Figures saved successfully!")
 
     def plot_loss(self, epoch_losses: np.array, target_directory: str):
         """

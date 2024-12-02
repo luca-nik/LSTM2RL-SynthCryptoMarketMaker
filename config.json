@@ -1,6 +1,6 @@
 {
   "data": {
-    "seq_length": 10,
+    "seq_length": 15,
     "pct_train": 0.8
   },
   "model": {
@@ -9,12 +9,13 @@
   },
   "training": {
     "batch_size": 32,
-    "epochs": 10,
+    "epochs": 100,
     "learning_rate": 0.001,
     "early_stopping_patience": 10
   },
   "paths": {
-    "model_path": "data/models/orderbook_generator.pth",
+    "orderbook_model_path": "data/models/orderbook_generator.pth",
+    "trades_model_path": "data/models/trades_generator.pth",
     "images_path": "images/",
     "trades_files_path": "attachments/trades.csv",
     "trades_save_path": "data/trades_df.parquet",

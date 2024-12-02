@@ -14,14 +14,14 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 from classes.plotter import Plotter
 
-class OrderBookGenerator(nn.Module):
+class TradesGenerator(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int,  CONFIG: dict, scaler: StandardScaler =  StandardScaler()):
-        super(OrderBookGenerator, self).__init__()
+        super(TradesGenerator, self).__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
-        self.features = ["Best Ask", "Ask Volume", "Best Bid", "Bid Volume"]
+        self.features = ["Price", "Amount", "Side"]
         # Initialize Plotter
-        self.plotter = Plotter(CONFIG['paths']['images_path'] + 'orderbook/', self.features)
+        self.plotter = Plotter(CONFIG['paths']['images_path'] + 'trades/', self.features)
         self.scaler = scaler
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -38,11 +38,10 @@ class OrderBookGenerator(nn.Module):
         #out = self.fc(lstm_out[:, -1, :])  # Take the output of the last time step
 
         # Apply ReLU to ask volume (index 1) and bid volume (index 3)
-        out[:, 1] = torch.relu(out[:, 1])  # Ask volume
-        out[:, 3] = torch.relu(out[:, 3])  # Bid volume
+        out[:, 1] = torch.relu(out[:, 1])  # Amount
 
         return out
-
+    
     def train_model(self, train_loader: DataLoader, epochs: int, lr: float = 0.001, device: torch.device = torch.device('cpu'), penalty_weight: float = 0.1) -> list:
         criterion = nn.MSELoss()
         optimizer = optim.Adam(self.parameters(), lr=lr)
@@ -53,22 +52,21 @@ class OrderBookGenerator(nn.Module):
             epoch_loss = 0.0  # Initialize epoch loss
     
             # Iterate through the batches in train_loader
-            for orderbook_batch, target_batch in train_loader:
-                orderbook_batch = orderbook_batch.to(device)
+            for trades_batch, target_batch in train_loader:
+                trades_batch = trades_batch.to(device)
                 target_batch = target_batch.to(device)
     
                 # Forward pass
-                output = self(orderbook_batch)
+                output = self(trades_batch)
                 
                 # Compute MSE loss
                 mse_loss = criterion(output, target_batch)
                 
                 # Compute penalty for negative predictions of ask and bid volumes
-                negative_ask_volume = torch.sum(torch.clamp(output[:, 1], min=0))  # Penalty for negative ask volume
-                negative_bid_volume = torch.sum(torch.clamp(output[:, 3], min=0))  # Penalty for negative bid volume
+                negative_ask_volume = torch.sum(torch.clamp(output[:, 1], min=0))  # Penalty Amount
     
                 # Total penalty
-                penalty = penalty_weight * (negative_ask_volume + negative_bid_volume)
+                penalty = penalty_weight * (negative_ask_volume)
     
                 # Total loss (MSE loss + penalty)
                 total_loss = mse_loss + penalty
@@ -99,12 +97,12 @@ class OrderBookGenerator(nn.Module):
 
         # Loop through the train_loader to get the data
         with torch.no_grad():
-            for orderbook_batch, target_batch in train_loader:
-                orderbook_batch = orderbook_batch.to(device)
+            for trades_batch, target_batch in train_loader:
+                trades_batch = trades_batch.to(device)
                 target_batch = target_batch.to(device)
 
                 # Get the predictions from the self
-                predicted_values = self.predict(orderbook_batch)
+                predicted_values = self.predict(trades_batch)
 
                 # Store the predictions and actual targets
                 predictions.append(predicted_values.cpu().numpy())
@@ -142,7 +140,7 @@ class OrderBookGenerator(nn.Module):
             test_data
             device (torch.device): Device (CPU or GPU) where the model runs.
         """
-        print('  Testing the Orderbook model')
+        print('  Testing the Trades model')
         self.eval()  # Set the model to evaluation mode
 
         test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
@@ -151,12 +149,12 @@ class OrderBookGenerator(nn.Module):
 
         # Loop through the train_loader to get the data
         with torch.no_grad():
-            for orderbook_batch, target_batch in test_loader:
-                orderbook_batch = orderbook_batch.to(device)
+            for trades_batch, target_batch in test_loader:
+                trades_batch = trades_batch.to(device)
                 target_batch = target_batch.to(device)
 
                 # Get the predictions from the model
-                predicted_values = self.predict(orderbook_batch)
+                predicted_values = self.predict(trades_batch)
 
                 # Store the predictions and actual targets
                 predictions.append(predicted_values.cpu().numpy())
@@ -180,39 +178,39 @@ class OrderBookGenerator(nn.Module):
         self.plotter.plot_actual_vs_predicted(targets_original, predictions_original, target_directory = 'test/')
         print('\n')
         return predictions
-        
-def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
-                                  device : torch.device = torch.device('cpu'), orderbook_scaler: StandardScaler =  StandardScaler()):
+
+def trades_model_load_or_train(trades_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
+                                  device : torch.device = torch.device('cpu'), trades_scaler: StandardScaler =  StandardScaler()):
     
 
     # Model setup
-    input_size = orderbook_train.tensors[0].shape[-1]  # Number of features in each input sequence
-    output_size = orderbook_train.tensors[0].shape[-1]   # Number of target features
+    input_size = trades_train.tensors[0].shape[-1]  # Number of features in each input sequence
+    output_size = trades_train.tensors[0].shape[-1]   # Number of target features
     hidden_size = CONFIG['model']['hidden_size']  # Number of hidden units in LSTM
     num_layers = CONFIG['model']['num_layers']  # Single LSTM layer
     
     # Initialize model and load into device
-    model = OrderBookGenerator(input_size, hidden_size, output_size, num_layers, CONFIG, orderbook_scaler)
+    model = TradesGenerator(input_size, hidden_size, output_size, num_layers, CONFIG, trades_scaler)
     model.to(device)
 
     # Data loader
-    orderbook_train_loader = DataLoader(orderbook_train, batch_size=CONFIG['training']['batch_size'], shuffle=False)
+    trades_train_loader = DataLoader(trades_train, batch_size=CONFIG['training']['batch_size'], shuffle=False)
 
     # Path of previously trained model
-    model_path = CONFIG['paths']['orderbook_model_path']
+    model_path = CONFIG['paths']['trades_model_path']
 
     # Check if the model exists and whether to retrain
     if os.path.exists(model_path) and not retrain_model:
-        print("  Loading pretrained Orderbook model ...")
+        print("  Loading pretrained Trades model ...")
         model.load_state_dict(torch.load(model_path, weights_only=True))  # Explicitly set weights_only=True
         model.eval()
-        print("  Orderbook model loaded!\n")
+        print("  Trades model loaded!\n")
     else:
-        print("  Training Orderbook model ...")
+        print("  Training Trades model ...")
         # Train the model and get loss history
         epochs = CONFIG['training']['epochs']
         lr = CONFIG['training']['learning_rate']
-        model.train_model(orderbook_train_loader, epochs=epochs, lr=lr, device=device)
+        model.train_model(trades_train_loader, epochs=epochs, lr=lr, device=device)
 
         # Save the trained model
         torch.save(model.state_dict(), model_path)

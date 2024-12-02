@@ -7,13 +7,15 @@ from helpers.data_handler import prepare_data
 from helpers.configurator import load_config
 
 from classes.orderbook_generator import  orderbook_model_load_or_train
+from classes.trades_generator import  trades_model_load_or_train
 
 def main():
     # Load config file
     CONFIG = load_config()
     
     # Define retraining flag: if True retrai the model
-    retrain_model = True
+    train_orderbook = True
+    train_trades = True
     
     # Set pandas display option to show 8 digits after the decimal point
     pd.set_option('display.float_format', '{:.8f}'.format)
@@ -27,17 +29,24 @@ def main():
     print("Loading completed!\n")
     
     print("Preparing datasets ...")
-    orderbook_train, trades_train, orderbook_test, trades_test, ob_scaler, tr_scaler = prepare_data(orderbook_df, trades_df, CONFIG)
-    #print(orderbook_train.tensors[0].shape)
-    #print(orderbook_train.tensors[1].shape)
-    #print(orderbook_test.tensors[0].shape)
-    #print(orderbook_test.tensors[1].shape)
+    orderbook_train, trades_train, orderbook_test, trades_test, orderbook_scaler, trades_scaler = prepare_data(orderbook_df, trades_df, CONFIG)
+    #print(trades_train.tensors[0].shape)
+    #print(trades_train.tensors[1].shape)
+    #print(trades_test.tensors[0].shape)
+    #print(trades_test.tensors[1].shape)
+    #sys.exit()
     print("Datasets prepared succesfully!\n")
     
-    # Initialize the model
-    orderbook_model = orderbook_model_load_or_train(orderbook_train, CONFIG, retrain_model, device, ob_scaler)
-    print("Testing the model ...")
+    # Load trained or train the models
+    print("Loading or training the models ...")
+    orderbook_model = orderbook_model_load_or_train(orderbook_train, CONFIG, train_orderbook, device, orderbook_scaler)
+    trades_model = trades_model_load_or_train(trades_train, CONFIG, train_trades, device, trades_scaler)
+    
+    # Test the models
+    print("Testing the models ...")
     orderbook_model.test(orderbook_test, device)
+    trades_model.test(trades_test, device)
+
 
     
     #trades_train_loader = DataLoader(trades_train, batch_size=CONFIG['training']['batch_size'], shuffle=False)
