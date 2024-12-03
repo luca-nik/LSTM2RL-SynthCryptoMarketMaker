@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 
 
-from classes.plotter import Plotter
+from utils.plotter import Plotter
 
 class TradesGenerator(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int,  CONFIG: dict, scaler: StandardScaler =  StandardScaler()):

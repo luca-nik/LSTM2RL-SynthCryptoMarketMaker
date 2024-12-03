@@ -2,8 +2,8 @@ import sys
 import pandas as pd
 import torch
 
-from data.data_loader import read_data
-from data.data_processer import prepare_data
+from data.loader import read_data
+from data.processer import prepare_data
 from utils.configurator import load_config
 
 from models.orderbook_generator import  orderbook_model_load_or_train
@@ -14,8 +14,8 @@ def main():
     CONFIG = load_config()
     
     # Define retraining flag: if True retrai the model
-    train_orderbook = True
-    train_trades = True
+    train_orderbook = False
+    train_trades = False
     
     # Set pandas display option to show 8 digits after the decimal point
     pd.set_option('display.float_format', '{:.8f}'.format)
