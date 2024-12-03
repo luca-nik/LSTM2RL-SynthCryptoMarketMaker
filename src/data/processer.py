@@ -1,10 +1,11 @@
-from typing import Tuple
+import sys
+from typing import Tuple, Dict
 
 import torch
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import TensorDataset
 
 def filter_relevant_features_and_split_data(
     orderbook_df: pd.DataFrame, 
@@ -82,7 +83,8 @@ def trades_extract_price_side_amount(row: pd.Series) -> pd.Series:
     amount = row['amount']
     return pd.Series([price, amount, side])
 
-def create_sequences(orderbook_data: pd.DataFrame, trades_data: pd.DataFrame, CONFIG: dict):
+def create_sequences(orderbook_data: pd.DataFrame, trades_data: pd.DataFrame, CONFIG: dict
+                     ) -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
     """
     Create sequences of data (with historical context) for training.
     
@@ -125,57 +127,90 @@ def create_sequences(orderbook_data: pd.DataFrame, trades_data: pd.DataFrame, CO
            torch.tensor(target_trades_sequences, dtype=torch.float32)
 
 # dcpr
-def standardize_data(train_data: pd.DataFrame, test_data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def standardize_data(train_data: pd.DataFrame, test_data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, StandardScaler]:
     """
     Standardizes the data using Z-score standardization.
-    
+
     Args:
         train_data (pd.DataFrame): Training data to fit the scaler.
         test_data (pd.DataFrame): Test data to apply the scaler.
-    
+
     Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: 
-            Standardized train and test data.
+        Tuple[pd.DataFrame, pd.DataFrame, StandardScaler]: 
+            - Standardized training data as a DataFrame.
+            - Standardized test data as a DataFrame.
+            - The fitted StandardScaler object.
     """
     scaler = StandardScaler()
-    
-    # Fit the scaler on training data
+
+    # Fit the scaler on the training data
     train_data_scaled = scaler.fit_transform(train_data)
-    
+
     # Apply the same transformation to the test data
     test_data_scaled = scaler.transform(test_data)
-    
+
     # Convert back to DataFrame for ease of use
     train_data_scaled = pd.DataFrame(train_data_scaled, columns=train_data.columns)
     test_data_scaled = pd.DataFrame(test_data_scaled, columns=test_data.columns)
-    
+
     return train_data_scaled, test_data_scaled, scaler
 
-def prepare_data(orderbook_df: pd.DataFrame, trades_df: pd.DataFrame, CONFIG: dict):
+def prepare_data(
+    orderbook_df: pd.DataFrame, 
+    trades_df: pd.DataFrame, 
+    CONFIG: Dict
+) -> Tuple[TensorDataset, TensorDataset, TensorDataset, TensorDataset, StandardScaler, StandardScaler]:
+    """
+    Prepares the data for training and testing by preprocessing, standardizing, 
+    creating sequences, and generating DataLoaders.
 
+    Args:
+        orderbook_df (pd.DataFrame): DataFrame containing the orderbook data.
+        trades_df (pd.DataFrame): DataFrame containing the trades data.
+        CONFIG (Dict): Configuration dictionary with the following expected keys:
+            - 'data': A dictionary containing:
+                - 'pct_train': Fraction of data to use for training.
+                - 'seq_length': Length of sequences for training.
 
-    # Preprocess the data and split them into train test
+    Returns:
+        Tuple[tensorDataset, TensorDataset, TensorDataset, TensorDataset, StandardScaler, StandardScaler]:
+            - Training dataset for orderbook data.
+            - Training dataset for trades data.
+            - Testing dataset for orderbook data.
+            - Testing dataset for trades data.
+            - Fitted scaler for orderbook data.
+            - Fitted scaler for trades data.
+    """
+    # Preprocess the data and split them into train and test
     orderbook_train, trades_train, orderbook_test, trades_test = filter_relevant_features_and_split_data(orderbook_df, trades_df, CONFIG)
     
     # Step 1: Standardize the Data
     orderbook_train_scaled, orderbook_test_scaled, orderbook_scaler = standardize_data(orderbook_train, orderbook_test)
     trades_train_scaled, trades_test_scaled, trades_scaler = standardize_data(trades_train, trades_test)
     
-    # Step 2: Create Sequences for training 
+    # Step 2: Create Sequences for Training 
     orderbook_train_sequences, trades_train_sequences, orderbook_train_target_sequences, trades_train_target_sequences = \
         create_sequences(orderbook_train_scaled, trades_train_scaled, CONFIG)
     
-    # Step 3: Prepare DataLoader for Training
+    # Step 3: Prepare TensorDatasets for Training and Testing
     orderbook_train_dataset = TensorDataset(orderbook_train_sequences, orderbook_train_target_sequences)
     trades_train_dataset = TensorDataset(trades_train_sequences, trades_train_target_sequences)
-    # And for test
+    
+    # For test data
     orderbook_test_dataset = TensorDataset(
         torch.tensor(orderbook_test_scaled.values, dtype=torch.float32), 
         torch.tensor(orderbook_test_scaled.values, dtype=torch.float32)
-        )
+    )
     trades_test_dataset = TensorDataset(
         torch.tensor(trades_test_scaled.values, dtype=torch.float32), 
         torch.tensor(trades_test_scaled.values, dtype=torch.float32)
-        )
+    )
 
-    return orderbook_train_dataset, trades_train_dataset, orderbook_test_dataset, trades_test_dataset, orderbook_scaler, trades_scaler
+    return (
+        orderbook_train_dataset, 
+        trades_train_dataset, 
+        orderbook_test_dataset, 
+        trades_test_dataset, 
+        orderbook_scaler, 
+        trades_scaler
+    )

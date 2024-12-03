@@ -55,7 +55,7 @@ class TradesGenerator(nn.Module):
         #out = self.fc(lstm_out[:, -1, :])  # Take the output of the last time step
 
         # Apply ReLU to ask volume (index 1) and bid volume (index 3)
-        out[:, 1] = torch.relu(out[:, 1])  # Amount
+        out[:, 2] = torch.relu(out[:, 1])  # Amount
 
         return out
     
