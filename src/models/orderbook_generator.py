@@ -15,11 +15,28 @@ from sklearn.metrics import mean_squared_error, r2_score
 from utils.plotter import Plotter
 
 class OrderBookGenerator(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int,  CONFIG: dict, scaler: StandardScaler =  StandardScaler()):
+    """
+    A PyTorch-based LSTM model for generating order book data.
+
+    Attributes:
+        lstm (nn.LSTM): LSTM layer for sequential data processing.
+        fc (nn.Linear): Fully connected layer for output predictions.
+        features (List[str]): Feature names for the order book.
+        device (torch.device, optional): Device for computation. Defaults to CPU.
+        plotter (Plotter): Utility for plotting results and metrics.
+        scaler (StandardScaler): Scaler for normalizing data.
+    """
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, num_layers: int,  
+                 CONFIG: dict, scaler: StandardScaler =  StandardScaler(), 
+                 device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super(OrderBookGenerator, self).__init__()
+        # LSTM
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
         self.features = ["Best Ask", "Ask Volume", "Best Bid", "Bid Volume"]
+        # Upload model on device
+        self.device = device
+        self.to(self.device)
         # Initialize Plotter
         self.plotter = Plotter(CONFIG['paths']['images_path'] + 'orderbook/', self.features)
         self.scaler = scaler
@@ -43,7 +60,16 @@ class OrderBookGenerator(nn.Module):
 
         return out
 
-    def train_model(self, train_loader: DataLoader, epochs: int, lr: float = 0.001, device: torch.device = torch.device('cpu'), penalty_weight: float = 0.1) -> list:
+    def train_model(self, train_loader: DataLoader, epochs: int, lr: float = 0.001, penalty_weight: float = 0.1) -> None:
+        """
+        Train the model on the given training data.
+
+        Args:
+            train_loader (DataLoader): DataLoader for training data.
+            epochs (int): Number of epochs to train.
+            lr (float): Learning rate for the optimizer.
+            penalty_weight (float): Weight for volume penalty term.
+        """
         criterion = nn.MSELoss()
         optimizer = optim.Adam(self.parameters(), lr=lr)
         
@@ -54,8 +80,8 @@ class OrderBookGenerator(nn.Module):
     
             # Iterate through the batches in train_loader
             for orderbook_batch, target_batch in train_loader:
-                orderbook_batch = orderbook_batch.to(device)
-                target_batch = target_batch.to(device)
+                orderbook_batch = orderbook_batch.to(self.device)
+                target_batch = target_batch.to(self.device)
     
                 # Forward pass
                 output = self(orderbook_batch)
@@ -92,34 +118,51 @@ class OrderBookGenerator(nn.Module):
         self.plotter.plot_loss(np.asarray(epoch_losses), target_directory = 'training/')
         
         # Evaluate trained model and plot
-        self.eval()
-
-        predictions = []
-        targets = []
-
-        # Loop through the train_loader to get the data
-        with torch.no_grad():
-            for orderbook_batch, target_batch in train_loader:
-                orderbook_batch = orderbook_batch.to(device)
-                target_batch = target_batch.to(device)
-
-                # Get the predictions from the self
-                predicted_values = self.predict(orderbook_batch)
-
-                # Store the predictions and actual targets
-                predictions.append(predicted_values.cpu().numpy())
-                targets.append(target_batch.cpu().numpy())
-
-        # Convert predictions and targets into a numpy array for easier plotting
-        predictions = np.concatenate(predictions, axis=0)
-        targets = np.concatenate(targets, axis=0)
-
-        # Inverse-transform data to the original scale using the scaler
-        predictions_original = self.scaler.inverse_transform(predictions)
-        targets_original = self.scaler.inverse_transform(targets)
+        predictions_original, targets_original = self.prediction(train_loader)
         
         # Plot Actual vs predicted on training set
         self.plotter.plot_actual_vs_predicted(targets_original, predictions_original, target_directory = 'training/')
+
+    def prediction(self, data: DataLoader) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Generate predictions for a given dataset using the trained model.
+    
+        Args:
+            data (DataLoader): A DataLoader object containing the input data and target values 
+                               for generating predictions.
+    
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: A tuple containing:
+                - predictions_original (np.ndarray): Predicted values scaled back to the original scale.
+                - targets_original (np.ndarray): Actual target values scaled back to the original scale.
+        """
+        self.eval()  # Set the model to evaluation mode
+    
+        predictions = []
+        targets = []
+    
+        # Loop through the data loader to get the input and target data
+        with torch.no_grad():
+            for trades_batch, target_batch in data:
+                trades_batch = trades_batch.to(self.device)  # Move input data to the model's device
+                target_batch = target_batch.to(self.device)  # Move target data to the model's device
+    
+                # Get the predictions from the model
+                predicted_values = self.predict(trades_batch)
+    
+                # Append predictions and targets as numpy arrays
+                predictions.append(predicted_values.cpu().numpy())
+                targets.append(target_batch.cpu().numpy())
+    
+        # Concatenate predictions and targets into numpy arrays for easier handling
+        predictions = np.concatenate(predictions, axis=0)
+        targets = np.concatenate(targets, axis=0)
+    
+        # Reverse the scaling transformation to get the original scale
+        predictions_original = self.scaler.inverse_transform(predictions)
+        targets_original = self.scaler.inverse_transform(targets)
+        
+        return predictions_original, targets_original
 
     def predict(self, input_data: torch.Tensor) -> torch.Tensor:
         """
@@ -134,41 +177,21 @@ class OrderBookGenerator(nn.Module):
         with torch.no_grad():
             return self(input_data)
 
-    def test(self, test_data, device: torch.device):
+    def test(self, test_data: TensorDataset) -> np.ndarray:
         """
         Evaluate the model on the test dataset and visualize the results.
     
         Args:
-            test_data
-            device (torch.device): Device (CPU or GPU) where the model runs.
+            test_data (TensorDataset): Training dataset.
+
+        Returns:
+            predictions (np.ndarray): array of model predictions scaled to the original scale
         """
         print('  Testing the Orderbook model')
-        self.eval()  # Set the model to evaluation mode
 
         test_loader = DataLoader(test_data, batch_size=1, shuffle=False)
-        predictions = []
-        targets = []
 
-        # Loop through the train_loader to get the data
-        with torch.no_grad():
-            for orderbook_batch, target_batch in test_loader:
-                orderbook_batch = orderbook_batch.to(device)
-                target_batch = target_batch.to(device)
-
-                # Get the predictions from the model
-                predicted_values = self.predict(orderbook_batch)
-
-                # Store the predictions and actual targets
-                predictions.append(predicted_values.cpu().numpy())
-                targets.append(target_batch.cpu().numpy())
-
-        # Convert predictions and targets into a numpy array for easier plotting
-        predictions = np.concatenate(predictions, axis=0)
-        targets = np.concatenate(targets, axis=0)
-
-        # Inverse-transform data to the original scale using the scaler
-        predictions_original = self.scaler.inverse_transform(predictions)
-        targets_original = self.scaler.inverse_transform(targets)
+        predictions, targets = self.prediction(test_loader)
 
         # Print Test info
         rmse = np.sqrt(((predictions - targets) ** 2).mean())
@@ -177,14 +200,28 @@ class OrderBookGenerator(nn.Module):
         print(f'  MAE: {mae}')
 
         # Plot
-        self.plotter.plot_actual_vs_predicted(targets_original, predictions_original, target_directory = 'test/')
-        print('\n')
+        self.plotter.plot_actual_vs_predicted(targets, predictions, target_directory = 'test/')
+        print(' ')
+
         return predictions
         
-def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, \
-                                  device : torch.device = torch.device('cpu'), orderbook_scaler: StandardScaler =  StandardScaler()):
-    
+def orderbook_model_load_or_train(orderbook_train: TensorDataset, CONFIG: dict, retrain_model: bool = False, 
+                                  device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+                                  orderbook_scaler: StandardScaler =  StandardScaler()
+                                  ) -> OrderBookGenerator:
+    """
+    Load or train the OrderbookGenerator model.
 
+    Args:
+        orderbook_train (TensorDataset): Training dataset.
+        CONFIG (dict): Configuration dictionary.
+        retrain_model (bool, optional): Whether to retrain the model. Defaults to False.
+        device (torch.device, optional): Device for computation. Defaults to CPU.
+        orderbook_scaler (Optional[StandardScaler], optional): Scaler for normalizing data. Defaults to None.
+    
+    Returns:
+        OrderbookGenerator: Trained model.
+    """
     # Model setup
     input_size = orderbook_train.tensors[0].shape[-1]  # Number of features in each input sequence
     output_size = orderbook_train.tensors[0].shape[-1]   # Number of target features

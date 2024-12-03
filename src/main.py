@@ -44,8 +44,8 @@ def main():
     
     # Test the models
     print("Testing the models ...")
-    orderbook_model.test(orderbook_test, device)
-    trades_model.test(trades_test, device)
+    orderbook_model.test(orderbook_test)
+    trades_model.test(trades_test)
 
 
     
