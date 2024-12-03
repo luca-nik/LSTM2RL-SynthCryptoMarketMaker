@@ -2,12 +2,12 @@ import sys
 import pandas as pd
 import torch
 
-from helpers.data_loader import read_data
-from helpers.data_handler import prepare_data
-from helpers.configurator import load_config
+from data.data_loader import read_data
+from data.data_processer import prepare_data
+from utils.configurator import load_config
 
-from classes.orderbook_generator import  orderbook_model_load_or_train
-from classes.trades_generator import  trades_model_load_or_train
+from models.orderbook_generator import  orderbook_model_load_or_train
+from models.trades_generator import  trades_model_load_or_train
 
 def main():
     # Load config file
