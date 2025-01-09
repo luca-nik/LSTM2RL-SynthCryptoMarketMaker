@@ -16,5 +16,4 @@ This project provides a framework for testing and improving market-making strate
 
 ## Objectives  
 - Model complex market dynamics using deep learning.  
-- Create a safe and flexible environment for experimenting with trading strategies.  
-- Advance the understanding of liquidity provision and risk management in financial markets.  
+- Create a safe and flexible training ground for experimenting with Market Making strategies in a crypto environment.
