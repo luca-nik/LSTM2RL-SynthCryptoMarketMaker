@@ -30,11 +30,6 @@ def main():
     
     print("Preparing datasets ...")
     orderbook_train, trades_train, orderbook_test, trades_test, orderbook_scaler, trades_scaler = prepare_data(orderbook_df, trades_df, CONFIG)
-    #print(trades_train.tensors[0].shape)
-    #print(trades_train.tensors[1].shape)
-    #print(trades_test.tensors[0].shape)
-    #print(trades_test.tensors[1].shape)
-    #sys.exit()
     print("Datasets prepared succesfully!\n")
     
     # Load trained or train the models
@@ -46,10 +41,6 @@ def main():
     print("Testing the models ...")
     orderbook_model.test(orderbook_test)
     trades_model.test(trades_test)
-
-
-    
-    #trades_train_loader = DataLoader(trades_train, batch_size=CONFIG['training']['batch_size'], shuffle=False)
 
 if __name__ == "__main__":
     main()
