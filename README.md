@@ -158,6 +158,3 @@ Check the `CONTRIBUTING.md` for detailed guidelines.
 ## License  
 This project is licensed under the MIT License. See `LICENSE` for more details.
 
----
-
-Would you like help creating the `CONTRIBUTING.md` or issue templates to further streamline contributions?
