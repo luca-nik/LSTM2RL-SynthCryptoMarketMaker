@@ -63,8 +63,4 @@ Thank you for your interest in contributing to **LSTM2RL-SynthCryptoMarketMaker*
 
 ---
 
-## Code of Conduct
-
-This project is committed to creating an open and welcoming environment. All contributors must adhere to our [Code of Conduct](CODE_OF_CONDUCT.md).
-
 Thank you for your contributions! 🎉
